@@ -189,27 +189,24 @@ export default function Home() {
                 >
                   <span className="font-semibold text-sm">{msg.user}: </span>
                   {msg.text && <div>{msg.text}</div>}
-                  {msg.fileData && (
-                    <div className="mt-2">
-                      {msg.fileType?.startsWith("image/") ? (
-                        <img
-                          src={msg.fileData}
-                          alt={msg.fileName}
-                          className="max-w-full rounded cursor-pointer hover:opacity-80"
-                          onClick={() => setFullscreenImage(msg.fileData)}
-                        />
-                      ) : (
-                        <a
-                          href={msg.fileData}
-                          download={msg.fileName}
-                          className="text-blue-600 underline"
-                          target="_blank"
-                        >
-                          {msg.fileName}
-                        </a>
-                      )}
-                    </div>
+                  {msg.fileData && msg.fileType?.startsWith("image/") ? (
+                    <img
+                      src={msg.fileData}
+                      alt={msg.fileName}
+                      className="max-w-full rounded cursor-pointer hover:opacity-80"
+                      onClick={() => msg.fileData && setFullscreenImage(msg.fileData)}
+                    />
+                  ) : (
+                    <a
+                      href={msg.fileData}
+                      download={msg.fileName}
+                      className="text-blue-600 underline"
+                      target="_blank"
+                    >
+                      {msg.fileName}
+                    </a>
                   )}
+
                   <div className="text-xs text-gray-400 mt-1 text-right">{msg.time}</div>
                 </div>
               </div>

@@ -1,48 +1,52 @@
+import { NextApiRequest, NextApiResponse } from "next";
 import { Server } from "socket.io";
-import type { NextApiRequest, NextApiResponse } from "next";
-
-type User = {
-  id: string;
-  name: string;
-};
-
-let onlineUsers: User[] = [];
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!res.socket.server.io) {
+  if (!res.socket?.server) {
+    res.status(500).end("Socket not initialized");
+    return;
+  }
+
+  // Initialize Socket.io only once
+  if (!(res.socket.server as any).io) {
     const io = new Server(res.socket.server, {
       path: "/api/socket",
       cors: { origin: "*" },
     });
-
-    res.socket.server.io = io;
+    (res.socket.server as any).io = io;
 
     io.on("connection", (socket) => {
-      console.log("Client connected");
+      console.log("New client connected:", socket.id);
 
-      // Handle new user join
+      // Track online users
       socket.on("join", (name: string) => {
-        onlineUsers.push({ id: socket.id, name });
-        io.emit("online-users", onlineUsers);
+        socket.data.name = name;
+        const users = Array.from(io.sockets.sockets.values()).map(s => ({
+          id: s.id,
+          name: s.data.name,
+        }));
+        io.emit("online-users", users);
       });
 
-      // Handle sending messages
+      // Broadcast message
       socket.on("send-message", (msg) => {
         io.emit("receive-message", msg);
-        });
+      });
 
-      // Handle typing
+      // Typing indicator
       socket.on("typing", (name: string) => {
         socket.broadcast.emit("typing", name);
       });
 
-      // Handle disconnect
       socket.on("disconnect", () => {
-        onlineUsers = onlineUsers.filter((u) => u.id !== socket.id);
-        io.emit("online-users", onlineUsers);
-        console.log("Client disconnected");
+        const users = Array.from(io.sockets.sockets.values()).map(s => ({
+          id: s.id,
+          name: s.data.name,
+        }));
+        io.emit("online-users", users);
       });
     });
   }
+
   res.end();
 }

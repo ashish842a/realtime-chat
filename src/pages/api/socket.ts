@@ -29,7 +29,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       // Handle sending messages
       socket.on("send-message", (msg) => {
         io.emit("receive-message", msg);
-      });
+        });
 
       // Handle typing
       socket.on("typing", (name: string) => {

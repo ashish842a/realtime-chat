@@ -9,10 +9,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Message = {
   user: string;
-  text: string;
-  time: string; 
+  text?: string;       // text messages
+  fileName?: string;   // file name
+  fileType?: string;   // MIME type
+  fileData?: string;   // base64 content
+  time: string;        // timestamp
 };
-
 
 type User = {
   id: string;
@@ -28,6 +30,7 @@ export default function Home() {
   const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
   const socketRef = useRef<Socket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/socket");
@@ -56,6 +59,15 @@ export default function Home() {
     };
   }, [name]);
 
+  // Close full-screen modal on Esc
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreenImage(null);
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
+
   const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -74,13 +86,12 @@ export default function Home() {
     const msg: Message = {
       user: name,
       text: input.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    socketRef.current.emit("send-message", msg); // broadcast to server
+    socketRef.current.emit("send-message", msg);
     setInput("");
   };
-
 
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
@@ -94,6 +105,25 @@ export default function Home() {
       e.preventDefault();
       entered ? handleSend() : handleJoin();
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !socketRef.current) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      const msg: Message = {
+        user: name,
+        fileName: file.name,
+        fileType: file.type,
+        fileData: base64Data,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      socketRef.current?.emit("send-message", msg);
+    };
+    reader.readAsDataURL(file);
   };
 
   if (!entered) {
@@ -118,7 +148,21 @@ export default function Home() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto mt-10">
+    <div className="max-w-2xl mx-auto mt-10 relative">
+      {/* Fullscreen Image Modal */}
+      {fullscreenImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <img
+            src={fullscreenImage}
+            alt="Full Screen"
+            className="max-h-[90%] max-w-[90%] rounded shadow-lg"
+          />
+        </div>
+      )}
+
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="text-center text-2xl">Realtime Chat</CardTitle>
@@ -139,15 +183,34 @@ export default function Home() {
               >
                 <div
                   className={`p-3 rounded-lg max-w-[75%] break-words ${msg.user === name
-                      ? "bg-blue-500 text-white rounded-br-none"
-                      : "bg-gray-200 text-gray-800 rounded-bl-none"
+                    ? "bg-blue-500 text-white rounded-br-none"
+                    : "bg-gray-200 text-gray-800 rounded-bl-none"
                     }`}
                 >
                   <span className="font-semibold text-sm">{msg.user}: </span>
-                  {msg.text}
-                  <div className="text-xs text-gray-400 mt-1 text-right">
-                    {msg.time}
-                  </div>
+                  {msg.text && <div>{msg.text}</div>}
+                  {msg.fileData && (
+                    <div className="mt-2">
+                      {msg.fileType?.startsWith("image/") ? (
+                        <img
+                          src={msg.fileData}
+                          alt={msg.fileName}
+                          className="max-w-full rounded cursor-pointer hover:opacity-80"
+                          onClick={() => setFullscreenImage(msg.fileData)}
+                        />
+                      ) : (
+                        <a
+                          href={msg.fileData}
+                          download={msg.fileName}
+                          className="text-blue-600 underline"
+                          target="_blank"
+                        >
+                          {msg.fileName}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  <div className="text-xs text-gray-400 mt-1 text-right">{msg.time}</div>
                 </div>
               </div>
             ))}
@@ -157,15 +220,25 @@ export default function Home() {
             )}
           </ScrollArea>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-2">
             <Input
               placeholder="Type a message..."
               value={input}
               onChange={handleTyping}
               onKeyDown={handleKeyPress}
             />
+            <input
+              type="file"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="file-input"
+            />
+            <label htmlFor="file-input" className="bg-gray-300 px-4 py-2 rounded cursor-pointer hover:bg-gray-400">
+              📎
+            </label>
             <Button onClick={handleSend}>Send</Button>
           </div>
+
         </CardContent>
       </Card>
     </div>
